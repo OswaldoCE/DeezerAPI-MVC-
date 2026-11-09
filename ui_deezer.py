@@ -409,8 +409,13 @@ class SpotifyAppCustom(ctk.CTk):
         agregadas = []
         for pl_id, (var, nombre) in self.check_vars.items():
             if var.get():
-                self.db.agregar_cancion_a_playlist(pl_id, self.cancion_seleccionada)
-                self.pila_historial.apilar({'playlist_id': pl_id, 'track': self.cancion_seleccionada})
+                relacion_id = self.db.agregar_cancion_a_playlist(pl_id, self.cancion_seleccionada)
+                self.pila_historial.apilar({
+                    'tipo': 'agregar',
+                    'playlist_id': pl_id,
+                    'relacion_id': relacion_id,
+                    'track': self.cancion_seleccionada,
+                })
                 agregadas.append(nombre)
 
         if agregadas:
@@ -732,28 +737,56 @@ class SpotifyAppCustom(ctk.CTk):
         lbl_dur.configure(text=f"⏱ Duración Total: {horas:02d}:{minutos:02d}:{segundos:02d} ({len(canciones)} temas)")
 
     def eliminar_cancion_playlist(self, relacion_id):
+        canciones = self.db.obtener_canciones_playlist(self.playlist_actual_id)
+        cancion = next((fila for fila in canciones if fila[6] == relacion_id), None)
+        if cancion is None:
+            return
+
+        track = {
+            'id': cancion[0],
+            'titulo': cancion[1],
+            'artista': cancion[2],
+            'album': cancion[3],
+            'duracion_seg': cancion[4],
+            'link': cancion[5],
+            'cover_url': cancion[7],
+        }
         self.db.eliminar_cancion_de_playlist(relacion_id)
+        self.pila_historial.apilar({
+            'tipo': 'eliminar',
+            'playlist_id': self.playlist_actual_id,
+            'relacion_id': relacion_id,
+            'track': track,
+        })
         self.cargar_playlist_seleccionada(self.playlist_actual_id, self.playlist_actual_nombre)
 
     def deshacer_accion(self):
-        if self.pila_historial.esta_vacia():
+        ultima_accion = self.pila_historial.ver_tope()
+        if ultima_accion is None:
             messagebox.showinfo("Información", "No hay acciones recientes para deshacer.")
             return
 
-        ultima_accion = self.pila_historial.desapilar()
         track = ultima_accion['track']
         pl_id = ultima_accion['playlist_id']
 
-        canciones = self.db.obtener_canciones_playlist(pl_id)
-        for id_d, tit, art, alb, dur, lk, pc_id, cov in reversed(canciones):
-            if id_d == track['id']:
-                self.db.eliminar_cancion_de_playlist(pc_id)
-                break
+        if ultima_accion['tipo'] == 'agregar':
+            self.db.eliminar_cancion_de_playlist(ultima_accion['relacion_id'])
+            mensaje = f"Se quitó '{track['titulo']}' de la playlist."
+        elif ultima_accion['tipo'] == 'eliminar':
+            self.db.restaurar_cancion_en_playlist(
+                pl_id, track, ultima_accion['relacion_id']
+            )
+            mensaje = f"Se restauró '{track['titulo']}' en la playlist."
+        else:
+            messagebox.showerror("Error", "No se reconoce la acción que se quiere deshacer.")
+            return
+
+        self.pila_historial.desapilar()
 
         if self.playlist_actual_id == pl_id:
             self.cargar_playlist_seleccionada(pl_id, self.playlist_actual_nombre)
 
-        messagebox.showinfo("Deshecho", f"Se eliminó '{track['titulo']}' de la playlist.")
+        messagebox.showinfo("Deshecho", mensaje)
 
     def encolar_cancion(self, track_dict):
         self.cola_reproduccion.encolar(track_dict)

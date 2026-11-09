@@ -37,6 +37,9 @@ class PilaLIFO:
     def desapilar(self):
         return self._items.pop() if not self.esta_vacia() else None
 
+    def ver_tope(self):
+        return self._items[-1] if not self.esta_vacia() else None
+
     def esta_vacia(self):
         return len(self._items) == 0
 
@@ -126,6 +129,17 @@ class BaseDatos:
                 INSERT INTO playlist_canciones (playlist_id, cancion_id_deezer)
                 VALUES (?, ?)
             """, (playlist_id, track_dict['id']))
+            conn.commit()
+            return cursor.lastrowid
+
+    def restaurar_cancion_en_playlist(self, playlist_id, track_dict, relacion_id):
+        self.guardar_cancion(track_dict)
+        with self.obtener_conexion() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO playlist_canciones (id, playlist_id, cancion_id_deezer)
+                VALUES (?, ?, ?)
+            """, (relacion_id, playlist_id, track_dict['id']))
             conn.commit()
 
     def obtener_canciones_playlist(self, playlist_id):
