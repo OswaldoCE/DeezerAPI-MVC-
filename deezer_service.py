@@ -62,21 +62,6 @@ class DeezerService:
                 'picture_url': artist.get('picture_medium', '')
             })
 
-        beatles_response = requests.get(
-            "https://api.deezer.com/search/artist",
-            params={"q": "The Beatles", "limit": 1},
-            timeout=10
-        )
-        beatles_response.raise_for_status()
-        beatles = beatles_response.json().get("data", [])
-        if beatles:
-            beatles_artist = beatles[0]
-            chart_artists.append({
-                'id': beatles_artist.get('id', 0),
-                'nombre': beatles_artist.get('name', 'The Beatles'),
-                'picture_url': beatles_artist.get('picture_medium', '')
-            })
-
         return chart_tracks, chart_artists
 
     def buscar_artista_o_canciones(self, query):
